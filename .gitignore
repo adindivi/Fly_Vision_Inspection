@@ -1,0 +1,25 @@
+*.iml
+.gradle/
+.kotlin/
+.idea/
+/local.properties
+local.properties
+
+# Build artifacts
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets, keys and environment
+.env
+debug.keystore
+my-upload-key.jks
+*.apk
+*.aab
+
+# OS files
+.DS_Store
+Thumbs.db
+
