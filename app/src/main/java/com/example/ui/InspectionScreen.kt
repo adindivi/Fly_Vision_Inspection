@@ -11,15 +11,14 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +33,26 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.domain.DepthResult
+import com.example.ui.components.CameraPermissionFallbackCard
+import com.example.ui.components.ElectronicCaliperHud
+import com.example.ui.components.ModernPermissionDialog
+import com.example.ui.components.openAppSettings
+import com.example.ui.theme.DotBlack
+import com.example.ui.theme.DotCardMist
+import com.example.ui.theme.DotFailRed
+import com.example.ui.theme.DotHeroCharcoal
+import com.example.ui.theme.DotNavGraphite
+import com.example.ui.theme.DotPassGreen
+import com.example.ui.theme.DotSlate
+import com.example.ui.theme.DotViolet
+import com.example.ui.theme.DotWhite
+import com.example.ui.theme.TossGray100
+import com.example.ui.theme.TossGray200
+import com.example.ui.theme.TossGray600
+import com.example.ui.theme.TossGray700
+import com.example.ui.theme.TossGray800
+import com.example.ui.theme.TossGray900
+import com.example.ui.theme.TossWhite
 import com.example.util.rememberDebouncedClick
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -41,6 +60,7 @@ import kotlin.math.abs
 @Composable
 fun InspectionScreen(
     viewModel: MainViewModel,
+    isCameraActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val depthResult by viewModel.depthData.collectAsState()
@@ -64,11 +84,15 @@ fun InspectionScreen(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
+    var showPermissionDialog by remember { mutableStateOf(!hasCameraPermission) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasCameraPermission = isGranted
+        if (isGranted) {
+            showPermissionDialog = false
+        }
     }
 
     val multiplePhotoPickerLauncher = rememberLauncherForActivityResult(
@@ -81,7 +105,7 @@ fun InspectionScreen(
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+            showPermissionDialog = true
         }
     }
     
@@ -146,13 +170,26 @@ fun InspectionScreen(
             flushTolerance = flushTolerance
         )
         
+        // Modern Runtime Camera Permission Dialog
+        if (showPermissionDialog && !hasCameraPermission) {
+            ModernPermissionDialog(
+                onDismiss = { showPermissionDialog = false },
+                onRequestPermission = {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                },
+                onOpenSettings = {
+                    openAppSettings(context)
+                }
+            )
+        }
+
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(8.dp)
         ) {
-            if (hasCameraPermission) {
+            if (hasCameraPermission && isCameraActive) {
                 CameraPreview(
                     analyzer = viewModel.engine,
                     onImageCaptured = { file ->
@@ -170,22 +207,22 @@ fun InspectionScreen(
                     isMeasuring = isMeasuring,
                     modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("카메라 권한이 필요합니다.")
-                }
+            } else if (!hasCameraPermission) {
+                CameraPermissionFallbackCard(
+                    onRequestPermission = {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                )
             }
             
-            // Central reticle overlay
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(80.dp)
-                    .height(2.dp)
-                    .background(Color.Red.copy(alpha = 0.5f))
+            // Keyence-grade AR Interactive Electronic Caliper & Real-time Tolerance Band HUD
+            ElectronicCaliperHud(
+                depthResult = depthResult,
+                gapTarget = gapTarget,
+                gapTolerance = gapTolerance,
+                flushTolerance = flushTolerance,
+                isMeasuring = isMeasuring,
+                modifier = Modifier.fillMaxSize()
             )
 
             // Real-time Surface Defect (Prophesee Metavision) Alert Pill (Auxiliary Mode)
@@ -204,7 +241,7 @@ fun InspectionScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "⚡ ${firstDefect.defectType} (${String.format("%.1f", firstDefect.lengthMm)}mm)",
+                            text = "${firstDefect.defectType} · ${String.format("%.1f", firstDefect.lengthMm)}mm",
                             color = Color.White,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             maxLines = 1,
@@ -295,9 +332,10 @@ fun InspectionScreen(
                     onDismissRequest = { viewModel.clearUiError() },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Warning,
+                            imageVector = Icons.Outlined.Warning,
                             contentDescription = "Warning",
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     title = {
@@ -324,7 +362,7 @@ fun InspectionScreen(
                                 viewModel.clearUiError()
                                 showSettingsDialog = true
                             }) {
-                                Text("⚙️ API 설정 열기")
+                                Text("API 설정 열기")
                             }
                         }
                     }
@@ -332,10 +370,11 @@ fun InspectionScreen(
             }
         }
         
-        // Auxiliary Mode Option Chips (Scratch Detection & Virtual Simulation)
+        // Clean White Minimal Capsule Chips for Mode & Tolerance Selection
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -343,34 +382,25 @@ fun InspectionScreen(
             FilterChip(
                 selected = isDefectDetectionEnabled,
                 onClick = { viewModel.toggleDefectDetection() },
+                modifier = Modifier.height(32.dp),
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, if (isDefectDetectionEnabled) DotViolet else TossGray200),
                 label = {
                     Text(
-                        text = if (isDefectDetectionEnabled) "🔍 스크래치 모드 ON" else "🔍 스크래치 모드 OFF",
+                        text = if (isDefectDetectionEnabled) "스크래치 감지 ON" else "스크래치 감지 OFF",
                         maxLines = 1,
                         softWrap = false,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isDefectDetectionEnabled) FontWeight.SemiBold else FontWeight.Normal
+                        )
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFFEF4444).copy(alpha = 0.15f),
-                    selectedLabelColor = Color(0xFFDC2626)
-                )
-            )
-
-            FilterChip(
-                selected = isVirtualSimulation,
-                onClick = { viewModel.toggleVirtualSimulation() },
-                label = {
-                    Text(
-                        text = if (isVirtualSimulation) "🔄 가상 시뮬레이션 ON" else "🔄 가상 모드 OFF",
-                        maxLines = 1,
-                        softWrap = false,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFF2563EB).copy(alpha = 0.15f),
-                    selectedLabelColor = Color(0xFF2563EB)
+                    selectedContainerColor = DotViolet,
+                    selectedLabelColor = TossWhite,
+                    containerColor = TossWhite,
+                    labelColor = TossGray800
                 )
             )
 
@@ -379,35 +409,43 @@ fun InspectionScreen(
                     when {
                         abs(gapTarget - 3.5f) < 0.1f -> {
                             viewModel.updateTolerances(2.0f, 0.4f, 0.2f)
-                            Toast.makeText(context, "💡 헤드램프 공차 (2.0±0.4mm, 단차±0.2) 적용", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "헤드램프 공차 (2.0±0.4mm, 단차±0.2) 적용", Toast.LENGTH_SHORT).show()
                         }
                         abs(gapTarget - 2.0f) < 0.1f -> {
                             viewModel.updateTolerances(4.0f, 0.6f, 0.4f)
-                            Toast.makeText(context, "🧰 트렁크 공차 (4.0±0.6mm, 단차±0.4) 적용", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "트렁크 리드 공차 (4.0±0.6mm, 단차±0.4) 적용", Toast.LENGTH_SHORT).show()
                         }
                         else -> {
                             viewModel.updateTolerances(3.5f, 0.5f, 0.3f)
-                            Toast.makeText(context, "🚗 도어 패널 공차 (3.5±0.5mm, 단차±0.3) 적용", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "도어 패널 공차 (3.5±0.5mm, 단차±0.3) 적용", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
+                modifier = Modifier.height(32.dp),
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, TossGray200),
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = TossWhite,
+                    labelColor = TossGray800
+                ),
                 label = {
                     val partLabel = when {
                         abs(gapTarget - 2.0f) < 0.1f -> "헤드램프 2.0mm"
-                        abs(gapTarget - 4.0f) < 0.1f -> "트렁크 4.0mm"
-                        else -> "도어 3.5mm"
+                        abs(gapTarget - 4.0f) < 0.1f -> "트렁크 리드 4.0mm"
+                        else -> "도어 패널 3.5mm"
                     }
                     Text(
-                        text = "🎯 $partLabel",
+                        text = partLabel,
                         maxLines = 1,
                         softWrap = false,
-                        style = MaterialTheme.typography.labelMedium
+                        color = TossGray800,
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp)
                     )
                 }
             )
         }
 
-        // Primary Inspection Action Buttons
+        // Clean White Minimal Capsule Action Buttons (Height: 46dp, Radius: 23dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -416,34 +454,38 @@ fun InspectionScreen(
         ) {
             Button(
                 onClick = debouncedToggleMeasure,
-                modifier = Modifier.weight(1.3f).height(52.dp),
-                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1.3f).height(46.dp),
+                shape = RoundedCornerShape(23.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isMeasuring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    containerColor = if (isMeasuring) DotFailRed else DotViolet,
+                    contentColor = TossWhite
                 )
             ) {
-                Icon(if (isMeasuring) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (isMeasuring) "측정 정지" else "측정 시작",
+                    text = if (isMeasuring) "측정 정지" else "검사 시작",
                     maxLines = 1,
                     softWrap = false,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    color = TossWhite,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
             
-            FilledTonalButton(
+            Button(
                 onClick = debouncedBulkAnalysis,
-                modifier = Modifier.weight(1f).height(52.dp),
-                shape = RoundedCornerShape(10.dp)
+                modifier = Modifier.weight(1f).height(46.dp),
+                shape = RoundedCornerShape(23.dp),
+                border = BorderStroke(1.dp, TossGray200),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TossWhite,
+                    contentColor = TossGray800
+                )
             ) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery Bulk Analysis")
-                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "일괄 분석",
                     maxLines = 1,
                     softWrap = false,
-                    style = MaterialTheme.typography.labelLarge
+                    color = TossGray800,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
                 )
             }
         }
@@ -459,73 +501,61 @@ fun StatusHud(
     gapTolerance: Float = 0.5f,
     flushTolerance: Float = 0.30f
 ) {
-    val bannerColor = if (!isMeasuring) Color(0xFF1E293B) // Premium Dark Slate
-                      else if (depthResult.isPass) Color(0xFF10B981) // Neon Green
-                      else Color(0xFFEF4444) // Warning Red
+    // Cinematic Dark Hero Charcoal Chrome (#282b32) with Clean White Minimal Capsules
+    val bannerColor = if (!isMeasuring) DotHeroCharcoal
+                      else if (depthResult.isPass) DotPassGreen
+                      else DotFailRed
 
     Surface(
         color = bannerColor,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-            // Row 1: Title, Tolerance spec pill, FPS pill, and Pass/Fail Badge
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)) {
+            // Row 1: Concise Title, Spec/FPS pill, and Pass/Fail Badge (Clean Capsules)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (isVirtualSimulation) "🔄 가상 시뮬레이션" else "차체 갭 / 단차 검사",
+                    text = "실시간 갭/단차",
                     modifier = Modifier.weight(1f, fill = false),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp),
+                    color = TossWhite
                 )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Surface(
-                        color = Color.Black.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(4.dp)
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(22.dp),
+                        border = BorderStroke(1.dp, TossGray200.copy(alpha = 0.45f))
                     ) {
                         Text(
-                            text = "기준 ${String.format("%.1f", gapTarget)}±${String.format("%.1f", gapTolerance)}",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            text = "${String.format("%.1f", gapTarget)}±${String.format("%.1f", gapTolerance)}mm · 60fps",
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
                             maxLines = 1,
                             softWrap = false,
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = Color.White
+                            color = TossWhite
                         )
                     }
 
                     Surface(
-                        color = Color.Black.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "60 FPS",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            maxLines = 1,
-                            softWrap = false,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = Color.White
-                        )
-                    }
-
-                    Surface(
-                        color = if (depthResult.isPass) Color.White else Color.Black,
-                        shape = RoundedCornerShape(4.dp)
+                        color = if (depthResult.isPass) DotPassGreen else DotFailRed,
+                        shape = RoundedCornerShape(22.dp)
                     ) {
                         Text(
                             text = if (depthResult.isPass) "PASS" else "FAIL",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.5.dp),
                             maxLines = 1,
                             softWrap = false,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (depthResult.isPass) Color(0xFF10B981) else Color(0xFFEF4444)
+                            color = TossWhite
                         )
                     }
                 }
@@ -533,46 +563,48 @@ fun StatusHud(
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            // Row 2: High-contrast Metrics & Scratch Status Pill
+            // Row 2: Responsive Metrics & Scratch Status Clean Capsule
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Text(
+                    text = "단차 ${String.format("%+.3f", depthResult.flushHeight)}mm (±${String.format("%.2f", flushTolerance)}) · 틈새 ${String.format("%.2f", depthResult.gapWidth)}mm",
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.5.sp,
+                        letterSpacing = (-0.2).sp
+                    ),
+                    color = TossWhite,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Surface(
+                    color = Color.Transparent,
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, TossGray200.copy(alpha = 0.4f))
                 ) {
                     Text(
-                        text = "단차: ${String.format("%+.3f", depthResult.flushHeight)}mm (±${String.format("%.2f", flushTolerance)})",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                    Text(
-                        text = "틈새: ${String.format("%.2f", depthResult.gapWidth)}mm",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
+                        text = if (!depthResult.isDefectDetectionEnabled) "Scratch OFF"
+                               else if (depthResult.defects.isEmpty()) "Scratch 0"
+                               else "Defect ${depthResult.defects.size}",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = if (depthResult.isDefectDetectionEnabled && depthResult.defects.isNotEmpty()) FontWeight.SemiBold else FontWeight.Normal
+                        ),
+                        color = if (!depthResult.isDefectDetectionEnabled) DotSlate
+                                else if (depthResult.defects.isEmpty()) TossWhite
+                                else Color(0xFFFDE047),
                         maxLines = 1,
                         softWrap = false
                     )
                 }
-
-                Text(
-                    text = if (!depthResult.isDefectDetectionEnabled) "스크래치 OFF"
-                           else if (depthResult.defects.isEmpty()) "스크래치 0건"
-                           else "⚠️ 결함 ${depthResult.defects.size}건",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 11.sp,
-                        fontWeight = if (depthResult.isDefectDetectionEnabled && depthResult.defects.isNotEmpty()) FontWeight.Bold else FontWeight.Normal
-                    ),
-                    color = if (!depthResult.isDefectDetectionEnabled) Color(0xFFCBD5E1)
-                            else if (depthResult.defects.isEmpty()) Color(0xFFE2E8F0)
-                            else Color(0xFFFDE047),
-                    maxLines = 1,
-                    softWrap = false
-                )
             }
         }
     }

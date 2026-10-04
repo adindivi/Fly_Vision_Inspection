@@ -19,9 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,10 +43,22 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.AiAnalysisRecord
+import com.example.ui.theme.DotBlack
+import com.example.ui.theme.DotCardMist
+import com.example.ui.theme.DotFailRed
+import com.example.ui.theme.DotHeroCharcoal
+import com.example.ui.theme.DotOffWhite
+import com.example.ui.theme.DotPassGreen
+import com.example.ui.theme.DotSlate
+import com.example.ui.theme.DotTagBorder
+import com.example.ui.theme.DotViolet
+import com.example.ui.theme.DotWhite
 import com.example.util.PdfReportGenerator
 import java.io.File
 
@@ -78,25 +89,32 @@ fun IndividualInspectionResultDialog(
                             Text(
                                 "검사 결과 상세 (Inspection Result)",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold,
+                                color = DotWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 record.formattedDate,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = DotSlate,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close Detail"
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Close Detail",
+                                tint = DotWhite,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = DotHeroCharcoal
                     )
                 )
             },
@@ -107,18 +125,20 @@ fun IndividualInspectionResultDialog(
                     },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share PDF Summary Report"
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = "Share PDF Summary Report",
+                            modifier = Modifier.size(18.dp)
                         )
                     },
                     text = {
                         Text(
                             "PDF 보고서 공유",
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = DotViolet,
+                    contentColor = DotWhite,
+                    shape = RoundedCornerShape(22.dp),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
@@ -126,19 +146,18 @@ fun IndividualInspectionResultDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(DotOffWhite)
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Status & Metadata Card
+                // Status & Metadata Card - 42dot Flat Tint Standard (0px Radius, Card Mist #f6f6f9)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = DotCardMist),
+                    shape = RoundedCornerShape(0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -146,47 +165,46 @@ fun IndividualInspectionResultDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
                                     text = if (record.id > 0) "표본 보고서 #DSP-${record.id}" else "표본 보고서",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DotBlack,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "Drosophila melanogaster",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = DotSlate,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Surface(
-                                color = if (isAnomalous) Color(0xFFEF4444) else Color(0xFF10B981),
-                                shape = RoundedCornerShape(20.dp)
+                                color = if (isAnomalous) DotFailRed else DotPassGreen,
+                                shape = RoundedCornerShape(22.dp)
                             ) {
                                 Text(
                                     text = if (isAnomalous) "DEFECT FLAGGED" else "INSPECTION PASS",
-                                    color = Color.White,
+                                    color = DotWhite,
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
+                                    softWrap = false,
+                                    maxLines = 1,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.PictureAsPdf,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "공유 버튼을 눌러 PDF 요약 보고서를 즉시 전송할 수 있습니다.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Text(
+                            text = "공유 버튼을 눌러 PDF 요약 보고서를 즉시 전송할 수 있습니다.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DotViolet
+                        )
                     }
                 }
 
@@ -197,7 +215,8 @@ fun IndividualInspectionResultDialog(
                     Text(
                         "표본 캡처 이미지 (Specimen Capture)",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold,
+                        color = DotBlack
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     SpecimenImagePreview(uriString = record.imageUri)
@@ -208,22 +227,23 @@ fun IndividualInspectionResultDialog(
                 Text(
                     "신경학적 육안 결함 분석 내용 (AI Findings)",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold,
+                    color = DotBlack
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    shape = RoundedCornerShape(0.dp),
+                    colors = CardDefaults.cardColors(containerColor = DotCardMist),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = record.apiResponse,
                             style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
+                            color = DotBlack,
+                            lineHeight = 22.sp,
+                            letterSpacing = (-0.2).sp
                         )
                     }
                 }
@@ -266,7 +286,7 @@ private fun SpecimenImagePreview(uriString: String, modifier: Modifier = Modifie
             modifier = modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .clip(RoundedCornerShape(12.dp)),
+                .clip(RoundedCornerShape(0.dp)),
             contentScale = ContentScale.Crop
         )
     } else {
@@ -274,14 +294,14 @@ private fun SpecimenImagePreview(uriString: String, modifier: Modifier = Modifie
             modifier = modifier
                 .fillMaxWidth()
                 .height(120.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(RoundedCornerShape(0.dp))
+                .background(DotCardMist),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 "이미지 파일 연결 불가",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = DotSlate
             )
         }
     }

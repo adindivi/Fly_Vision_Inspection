@@ -7,13 +7,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -89,20 +88,11 @@ fun ApiSettingsDialog(
                     .padding(20.dp)
             ) {
                 // Header
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Gemini AI API & 모델 설정",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "Gemini AI API & 모델 설정",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -117,7 +107,7 @@ fun ApiSettingsDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (isKeyConfigured) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            imageVector = if (isKeyConfigured) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                             contentDescription = null,
                             tint = if (isKeyConfigured) Color(0xFF34D399) else Color(0xFFF87171),
                             modifier = Modifier.size(18.dp)
@@ -164,14 +154,15 @@ fun ApiSettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("AIzaSy...") },
                     leadingIcon = {
-                        Icon(Icons.Default.Key, contentDescription = null)
+                        Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
                     trailingIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { isKeyVisible = !isKeyVisible }) {
                                 Icon(
-                                    imageVector = if (isKeyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Toggle Visibility"
+                                    imageVector = if (isKeyVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                    contentDescription = "Toggle Visibility",
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                             IconButton(onClick = {
@@ -180,8 +171,9 @@ fun ApiSettingsDialog(
                                 }
                             }) {
                                 Icon(
-                                    imageVector = Icons.Default.ContentPaste,
-                                    contentDescription = "Paste from Clipboard"
+                                    imageVector = Icons.Outlined.ContentPaste,
+                                    contentDescription = "Paste from Clipboard",
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }

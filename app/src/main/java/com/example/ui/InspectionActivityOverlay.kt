@@ -31,18 +31,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Air
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Grain
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Grain
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -184,7 +181,7 @@ fun InspectionActivityOverlay(
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Icon(
-                        imageVector = Icons.Default.ExpandLess,
+                        imageVector = Icons.Outlined.ExpandLess,
                         contentDescription = "Expand Inspection Activity",
                         tint = Color(0xFF94A3B8),
                         modifier = Modifier.size(18.dp)
@@ -215,20 +212,27 @@ fun InspectionActivityOverlay(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             PulsingLiveIndicator(isAnalyzing = isAnalyzing, hasAnomalies = anomalyCount > 0)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
                                     text = "Inspection Activity",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = Color.White,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = if (isAnalyzing) "Gemini API real-time feature streaming..." else "Live Drosophila Morphology Feed",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isAnalyzing) Color(0xFF38BDF8) else Color(0xFF94A3B8)
+                                    color = if (isAnalyzing) Color(0xFF38BDF8) else Color(0xFF94A3B8),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -246,6 +250,8 @@ fun InspectionActivityOverlay(
                                         color = Color(0xFF34D399),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
+                                        softWrap = false,
+                                        maxLines = 1,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
@@ -262,6 +268,8 @@ fun InspectionActivityOverlay(
                                         color = Color(0xFFFCA5A5),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
+                                        softWrap = false,
+                                        maxLines = 1,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
@@ -274,7 +282,7 @@ fun InspectionActivityOverlay(
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.ExpandMore,
+                                    imageVector = Icons.Outlined.ExpandMore,
                                     contentDescription = "Collapse Activity Panel",
                                     tint = Color(0xFFCBD5E1),
                                     modifier = Modifier.size(20.dp)
@@ -410,7 +418,7 @@ fun InspectionActivityOverlay(
                                     )
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Share,
+                                        imageVector = Icons.Outlined.Share,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -451,6 +459,8 @@ private fun ActivityFilterChip(
             fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = if (selected) highlightColor ?: Color(0xFF38BDF8) else Color(0xFF94A3B8),
+            softWrap = false,
+            maxLines = 1,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
@@ -474,12 +484,12 @@ private fun ActivityItemRow(item: InspectionActivityItem) {
     }
 
     val icon: ImageVector = when {
-        isAnomaly -> Icons.Default.Warning
-        item.anatomicalRegion.contains("eye", ignoreCase = true) -> Icons.Default.Visibility
-        item.anatomicalRegion.contains("wing", ignoreCase = true) -> Icons.Default.Air
-        item.anatomicalRegion.contains("bristle", ignoreCase = true) || item.anatomicalRegion.contains("chaetae", ignoreCase = true) -> Icons.Default.Grain
-        item.anatomicalRegion.contains("cuticle", ignoreCase = true) || item.anatomicalRegion.contains("abdomen", ignoreCase = true) -> Icons.Default.Layers
-        else -> Icons.Default.BugReport
+        isAnomaly -> Icons.Outlined.Warning
+        item.anatomicalRegion.contains("eye", ignoreCase = true) -> Icons.Outlined.Visibility
+        item.anatomicalRegion.contains("wing", ignoreCase = true) -> Icons.Outlined.Air
+        item.anatomicalRegion.contains("bristle", ignoreCase = true) || item.anatomicalRegion.contains("chaetae", ignoreCase = true) -> Icons.Outlined.Grain
+        item.anatomicalRegion.contains("cuticle", ignoreCase = true) || item.anatomicalRegion.contains("abdomen", ignoreCase = true) -> Icons.Outlined.Layers
+        else -> Icons.Outlined.BugReport
     }
 
     val iconTint = when {
@@ -534,12 +544,15 @@ private fun ActivityItemRow(item: InspectionActivityItem) {
                 ) {
                     Text(
                         text = item.anatomicalRegion,
+                        modifier = Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Confidence Pill
@@ -548,7 +561,9 @@ private fun ActivityItemRow(item: InspectionActivityItem) {
                                 text = "${item.confidence}%",
                                 fontSize = 10.sp,
                                 color = Color(0xFF94A3B8),
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                softWrap = false,
+                                maxLines = 1
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                         }
@@ -571,6 +586,8 @@ private fun ActivityItemRow(item: InspectionActivityItem) {
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White,
+                                softWrap = false,
+                                maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }

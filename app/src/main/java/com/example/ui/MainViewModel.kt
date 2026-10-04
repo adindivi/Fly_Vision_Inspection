@@ -215,7 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val effectiveKey = if (testKey.isNotBlank()) testKey else appSettings.getEffectiveApiKey()
                 if (effectiveKey.isBlank() || effectiveKey == "MY_GEMINI_API_KEY") {
-                    _apiTestResult.value = "❌ API 키를 입력해주세요."
+                    _apiTestResult.value = "API 키를 입력해주세요."
                     return@launch
                 }
                 withContext(Dispatchers.IO) {
@@ -230,10 +230,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         request = req
                     )
                     val text = resp.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
-                    _apiTestResult.value = "✅ 연결 성공! (${testModel})\n응답: ${text.trim().take(40)}"
+                    _apiTestResult.value = "연결 성공 (${testModel})\n응답: ${text.trim().take(40)}"
                 }
             } catch (e: Exception) {
-                _apiTestResult.value = "❌ 연결 실패: ${e.localizedMessage ?: e.message}"
+                _apiTestResult.value = "연결 실패: ${e.localizedMessage ?: e.message}"
             } finally {
                 _isTestingApiKey.value = false
             }
@@ -410,115 +410,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         responseText: String,
         sourceTag: String = "Live Capture"
     ): List<com.example.domain.InspectionActivityItem> {
-        val items = mutableListOf<com.example.domain.InspectionActivityItem>()
-        val lines = responseText.lines()
-        val regex = Regex("""^-\s*(FEATURE|ANOMALY)\s*\|\s*(.*?)\s*\|\s*(PASS|DEFECT|WARNING)\s*\|\s*(\d+)%?\s*\|\s*(.*)$""", RegexOption.IGNORE_CASE)
-
-        for (line in lines) {
-            val trimmed = line.trim()
-            val match = regex.find(trimmed)
-            if (match != null) {
-                val typeStr = match.groupValues[1].uppercase()
-                val region = match.groupValues[2].trim()
-                val statusStr = match.groupValues[3].uppercase()
-                val conf = match.groupValues[4].toIntOrNull() ?: 90
-                val details = match.groupValues[5].trim()
-
-                val type = if (typeStr == "ANOMALY" || statusStr == "DEFECT") com.example.domain.ActivityType.ANOMALY else com.example.domain.ActivityType.FEATURE
-                val status = when (statusStr) {
-                    "DEFECT" -> com.example.domain.ActivityStatus.DEFECT
-                    "WARNING" -> com.example.domain.ActivityStatus.WARNING
-                    else -> com.example.domain.ActivityStatus.PASS
-                }
-
-                items.add(
-                    com.example.domain.InspectionActivityItem(
-                        type = type,
-                        anatomicalRegion = region,
-                        status = status,
-                        confidence = conf,
-                        details = details,
-                        specimenSource = sourceTag
-                    )
-                )
-            }
-        }
-
-        // Intelligent fallback if Gemini response didn't use strict pipe syntax
-        if (items.isEmpty()) {
-            val lower = responseText.lowercase()
-            val regions = listOf(
-                "Compound Eye" to listOf("eye", "ommatidi", "ocelli", "facet"),
-                "Wing Morphology" to listOf("wing", "blade", "haltere", "vein"),
-                "Thorax & Bristles" to listOf("thorax", "bristle", "chaetae", "scutum"),
-                "Abdomen & Tergites" to listOf("abdomen", "tergite", "segment", "pleural"),
-                "Cuticle & Surface Flush" to listOf("cuticle", "flush", "gap", "surface", "scratch", "suture")
-            )
-
-            for ((regionName, keywords) in regions) {
-                val matchingSentence = lines.firstOrNull { l ->
-                    keywords.any { k -> l.contains(k, ignoreCase = true) }
-                }
-
-                if (matchingSentence != null) {
-                    val isAnomaly = matchingSentence.contains("defect", ignoreCase = true) ||
-                            matchingSentence.contains("scratch", ignoreCase = true) ||
-                            matchingSentence.contains("anomal", ignoreCase = true) ||
-                            matchingSentence.contains("notched", ignoreCase = true) ||
-                            matchingSentence.contains("tear", ignoreCase = true) ||
-                            matchingSentence.contains("mutation", ignoreCase = true) ||
-                            matchingSentence.contains("deform", ignoreCase = true)
-
-                    items.add(
-                        com.example.domain.InspectionActivityItem(
-                            type = if (isAnomaly) com.example.domain.ActivityType.ANOMALY else com.example.domain.ActivityType.FEATURE,
-                            anatomicalRegion = regionName,
-                            status = if (isAnomaly) com.example.domain.ActivityStatus.DEFECT else com.example.domain.ActivityStatus.PASS,
-                            confidence = (88..98).random(),
-                            details = matchingSentence.trim().removePrefix("-").removePrefix("*").trim(),
-                            specimenSource = sourceTag
-                        )
-                    )
-                }
-            }
-
-            if (items.isEmpty()) {
-                val hasAnomaly = lower.contains("defect") || lower.contains("anomal") || lower.contains("scratch")
-                items.add(
-                    com.example.domain.InspectionActivityItem(
-                        type = if (hasAnomaly) com.example.domain.ActivityType.ANOMALY else com.example.domain.ActivityType.FEATURE,
-                        anatomicalRegion = "Drosophila Surface Morphology",
-                        status = if (hasAnomaly) com.example.domain.ActivityStatus.DEFECT else com.example.domain.ActivityStatus.PASS,
-                        confidence = 92,
-                        details = responseText.take(150),
-                        specimenSource = sourceTag
-                    )
-                )
-            }
-        }
-
-        return items
+        return com.example.domain.InspectionResponseParser.parse(responseText, sourceTag)
     }
 
     private fun getDrosophilaInspectionPrompt(): String {
-        return """
-            You are an expert Drosophila melanogaster (fruit fly) visual morphology and neurological surface inspection assistant.
-            Analyze this specimen image for anatomical features and detect any anomalies, defects, or mutations.
-            
-            You MUST format your output with a section named "INSPECTION_ITEMS:" containing line-by-line items in this exact syntax:
-            INSPECTION_ITEMS:
-            - [FEATURE or ANOMALY] | [Anatomical Area: Compound Eye / Wing Margin / Wing Venation / Thoracic Bristles / Thoracic Cuticle / Abdominal Tergite / Cuticle Surface / Appendages] | [PASS or DEFECT] | [Confidence 0-100%] | [Detailed observation of feature or anomaly]
-            
-            Examples:
-            - FEATURE | Compound Eye | PASS | 96% | Wild-type brick-red pigmentation with intact hexagonal ommatidial array.
-            - ANOMALY | Wing Margin | DEFECT | 92% | Notched wing blade anomaly on distal posterior margin.
-            - FEATURE | Thoracic Bristles | PASS | 95% | Intact standard bilateral macrochaetae arrangement.
-            - ANOMALY | Cuticle Surface | DEFECT | 88% | Micro-abrasion scratch and surface flush step mismatch on scutum.
-            - FEATURE | Abdominal Tergites | PASS | 94% | Normal pigmented tergite bands A1-A6 without melanotic nodules.
-            
-            SUMMARY:
-            [Provide a 2-3 sentence overall diagnostic summary of specimen health and defect flags]
-        """.trimIndent()
+        return com.example.domain.InspectionResponseParser.getInspectionPrompt()
+    }
+
+    private fun createGenerateContentRequest(base64Image: String): GenerateContentRequest {
+        return GenerateContentRequest(
+            contents = listOf(
+                Content(
+                    parts = listOf(
+                        Part(text = getDrosophilaInspectionPrompt()),
+                        Part(inlineData = InlineData(mimeType = "image/jpeg", data = base64Image))
+                    )
+                )
+            ),
+            generationConfig = GenerationConfig(temperature = _aiConfidenceThreshold.value)
+        )
+    }
+
+    private fun formatFriendlyErrorMessage(e: Exception, contextLabel: String = "AI 분석"): String {
+        return when {
+            e.message?.contains("404") == true -> "AI 분석 모델을 찾을 수 없습니다. (API 엔드포인트 404)"
+            e.message?.contains("403") == true || e.message?.contains("401") == true -> "API 키 인증에 실패했습니다. Gemini API 키를 확인해주세요."
+            e.message?.contains("Unable to resolve host") == true -> "네트워크 연결을 확인해주세요."
+            else -> "$contextLabel 중 오류가 발생했습니다: ${e.localizedMessage ?: e.message}"
+        }
     }
 
     fun analyzeImage(imageFile: File) {
@@ -528,7 +447,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (!appSettings.hasValidApiKey()) {
-            val errorMsg = "Gemini API 키가 설정되지 않았습니다. 상단 ⚙️ 설정에서 API 키를 입력해주세요."
+            val errorMsg = "Gemini API 키가 설정되지 않았습니다. 상단 설정에서 API 키를 입력해주세요."
             Log.e(TAG, errorMsg)
             _uiError.value = errorMsg
             _analysisResult.value = errorMsg
@@ -542,49 +461,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _analysisResult.value = null
 
         // Pre-populate real-time staged scanning items into the activity overlay
-        val stagedItems = listOf(
-            com.example.domain.InspectionActivityItem(
-                type = com.example.domain.ActivityType.FEATURE,
-                anatomicalRegion = "Optical Specimen Alignment",
-                status = com.example.domain.ActivityStatus.PROCESSING,
-                confidence = 98,
-                details = "Verifying drosophila orientation, focus, and macro lens framing...",
-                specimenSource = "Live Capture"
-            ),
-            com.example.domain.InspectionActivityItem(
-                type = com.example.domain.ActivityType.FEATURE,
-                anatomicalRegion = "Compound Eye & Ommatidia",
-                status = com.example.domain.ActivityStatus.PROCESSING,
-                confidence = 90,
-                details = "Scanning hexagonal ommatidial facet array and brick-red pigmentation...",
-                specimenSource = "Live Capture"
-            ),
-            com.example.domain.InspectionActivityItem(
-                type = com.example.domain.ActivityType.FEATURE,
-                anatomicalRegion = "Wing Margins & Venation",
-                status = com.example.domain.ActivityStatus.PROCESSING,
-                confidence = 90,
-                details = "Tracing longitudinal veins L1-L5 and examining blade border integrity...",
-                specimenSource = "Live Capture"
-            ),
-            com.example.domain.InspectionActivityItem(
-                type = com.example.domain.ActivityType.FEATURE,
-                anatomicalRegion = "Thoracic Chaetae & Bristles",
-                status = com.example.domain.ActivityStatus.PROCESSING,
-                confidence = 90,
-                details = "Assessing symmetry of 4 dorsocentral macrochaetae on scutum...",
-                specimenSource = "Live Capture"
-            ),
-            com.example.domain.InspectionActivityItem(
-                type = com.example.domain.ActivityType.FEATURE,
-                anatomicalRegion = "Abdominal Tergites & Flush",
-                status = com.example.domain.ActivityStatus.PROCESSING,
-                confidence = 90,
-                details = "Evaluating A1-A6 pigment stripes and lateral cuticle flush level...",
-                specimenSource = "Live Capture"
-            )
-        )
-        _inspectionActivities.value = stagedItems
+        _inspectionActivities.value = com.example.domain.InspectionResponseParser.createInitialStagedItems()
 
         viewModelScope.launch {
             try {
@@ -593,17 +470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ?: throw IllegalStateException("Failed to decode image file: ${imageFile.name}")
                     val base64Image = ImageUtils.bitmapToBase64Jpeg(bitmap)
 
-                    val request = GenerateContentRequest(
-                        contents = listOf(
-                            Content(
-                                parts = listOf(
-                                    Part(text = getDrosophilaInspectionPrompt()),
-                                    Part(inlineData = InlineData(mimeType = "image/jpeg", data = base64Image))
-                                )
-                            )
-                        ),
-                        generationConfig = GenerationConfig(temperature = _aiConfidenceThreshold.value)
-                    )
+                    val request = createGenerateContentRequest(base64Image)
                     
                     val response = RetrofitClient.service.generateContent(
                         model = model,
@@ -629,24 +496,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _analysisResult.value = result
             } catch (e: Exception) {
                 Log.e(TAG, "Gemini image analysis failed: ${e.message}", e)
-                val friendlyMessage = when {
-                    e.message?.contains("404") == true -> "AI 분석 모델을 찾을 수 없습니다. (API 엔드포인트 404)"
-                    e.message?.contains("403") == true || e.message?.contains("401") == true -> "API 키 인증에 실패했습니다. Gemini API 키를 확인해주세요."
-                    e.message?.contains("Unable to resolve host") == true -> "네트워크 연결을 확인해주세요."
-                    else -> "AI 분석 중 오류가 발생했습니다: ${e.localizedMessage ?: e.message}"
-                }
+                val friendlyMessage = formatFriendlyErrorMessage(e, "AI 분석")
                 _uiError.value = friendlyMessage
                 _analysisResult.value = "Analysis Error: ${e.message}"
-                _inspectionActivities.value = listOf(
-                    com.example.domain.InspectionActivityItem(
-                        type = com.example.domain.ActivityType.ANOMALY,
-                        anatomicalRegion = "Gemini Processing Pipeline",
-                        status = com.example.domain.ActivityStatus.DEFECT,
-                        confidence = 0,
-                        details = friendlyMessage,
-                        specimenSource = "Error"
-                    )
-                )
+                _inspectionActivities.value = listOf(com.example.domain.InspectionResponseParser.createErrorItem(friendlyMessage))
             } finally {
                 _isAnalyzing.value = false
             }
@@ -661,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (!appSettings.hasValidApiKey()) {
-            val errorMsg = "Gemini API 키가 설정되지 않았습니다. 상단 ⚙️ 설정에서 API 키를 입력해주세요."
+            val errorMsg = "Gemini API 키가 설정되지 않았습니다. 상단 설정에서 API 키를 입력해주세요."
             Log.e(TAG, errorMsg)
             _uiError.value = errorMsg
             _analysisResult.value = errorMsg
@@ -682,30 +535,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _bulkAnalysisProgress.value = Pair(index + 1, uris.size)
                         
                         // Add live processing item for this batch specimen
-                        val liveBatchItem = com.example.domain.InspectionActivityItem(
-                            type = com.example.domain.ActivityType.FEATURE,
-                            anatomicalRegion = "Batch Specimen ${index + 1}/${uris.size}",
-                            status = com.example.domain.ActivityStatus.PROCESSING,
-                            confidence = 90,
-                            details = "Transmitting image payload to $model...",
-                            specimenSource = "Batch File ${index + 1}"
-                        )
+                        val liveBatchItem = com.example.domain.InspectionResponseParser.createBatchProcessingItem(index, uris.size, model)
                         _inspectionActivities.value = listOf(liveBatchItem) + _inspectionActivities.value
 
                         val bitmap = ImageUtils.decodeSampledBitmapFromUri(context, uri) ?: return@forEachIndexed
                         val base64Image = ImageUtils.bitmapToBase64Jpeg(bitmap)
                         
-                        val request = GenerateContentRequest(
-                            contents = listOf(
-                                Content(
-                                    parts = listOf(
-                                        Part(text = getDrosophilaInspectionPrompt()),
-                                        Part(inlineData = InlineData(mimeType = "image/jpeg", data = base64Image))
-                                    )
-                                )
-                            ),
-                            generationConfig = GenerationConfig(temperature = _aiConfidenceThreshold.value)
-                        )
+                        val request = createGenerateContentRequest(base64Image)
                         
                         val response = RetrofitClient.service.generateContent(
                             model = model,
@@ -730,12 +566,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _analysisResult.value = "Batch analysis completed for ${uris.size} images."
             } catch (e: Exception) {
                 Log.e(TAG, "Batch analysis failed: ${e.message}", e)
-                val friendlyMessage = when {
-                    e.message?.contains("404") == true -> "AI 분석 모델을 찾을 수 없습니다. (API 엔드포인트 404)"
-                    e.message?.contains("403") == true || e.message?.contains("401") == true -> "API 키 인증에 실패했습니다. Gemini API 키를 확인해주세요."
-                    e.message?.contains("Unable to resolve host") == true -> "네트워크 연결을 확인해주세요."
-                    else -> "일괄 분석 중 오류가 발생했습니다: ${e.localizedMessage ?: e.message}"
-                }
+                val friendlyMessage = formatFriendlyErrorMessage(e, "일괄 분석")
                 _uiError.value = friendlyMessage
                 _analysisResult.value = "Batch Analysis Error: ${e.message}"
             } finally {

@@ -32,13 +32,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.FlashOff
-import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.TimerOff
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.FlashOff
+import androidx.compose.material.icons.outlined.FlashOn
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -97,6 +95,23 @@ fun CameraPreview(
 
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
+    var cameraProviderRef by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    // Clean resource disposal: unbind all CameraX use cases & shutdown executor on unmount
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                cameraProviderRef?.unbindAll()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            try {
+                executor.shutdown()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     // Fallback internal macro state if caller doesn't provide a toggle callback
     var localMacroMode by remember { mutableStateOf(false) }
@@ -215,6 +230,7 @@ fun CameraPreview(
                 
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
+                    cameraProviderRef = cameraProvider
                     
                     val preview = androidx.camera.core.Preview.Builder()
                         .build()
@@ -227,12 +243,24 @@ fun CameraPreview(
                     try {
                         cameraProvider.unbindAll()
                         val camera = if (analyzer != null) {
+                            var lastAnalyzedTime = 0L
+                            val throttledAnalyzer = ImageAnalysis.Analyzer { imageProxy ->
+                                val now = System.currentTimeMillis()
+                                // When not actively measuring, throttle analysis to ~2 FPS (every 500ms)
+                                // to eliminate heavy CPU/GPU load and prevent device heating during idle preview
+                                if (!isMeasuring && (now - lastAnalyzedTime < 500L)) {
+                                    imageProxy.close()
+                                    return@Analyzer
+                                }
+                                lastAnalyzedTime = now
+                                analyzer.analyze(imageProxy)
+                            }
                             val imageAnalysis = ImageAnalysis.Builder()
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                                 .build()
                                 .also {
-                                    it.setAnalyzer(executor, analyzer)
+                                    it.setAnalyzer(executor, throttledAnalyzer)
                                 }
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
@@ -303,7 +331,7 @@ fun CameraPreview(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = if (effectiveArtificialLight) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                        imageVector = if (effectiveArtificialLight) Icons.Outlined.FlashOn else Icons.Outlined.FlashOff,
                         contentDescription = "Torch Toggle",
                         tint = if (effectiveArtificialLight) Color.Black else Color.White,
                         modifier = Modifier.size(18.dp)
@@ -329,7 +357,7 @@ fun CameraPreview(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.CenterFocusStrong,
+                        imageVector = Icons.Outlined.CenterFocusStrong,
                         contentDescription = "Macro Toggle",
                         tint = if (effectiveMacroMode) Color.White else Color.White,
                         modifier = Modifier.size(18.dp)
@@ -347,7 +375,7 @@ fun CameraPreview(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.CameraAlt,
+                        imageVector = Icons.Outlined.CameraAlt,
                         contentDescription = "Snapshot",
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)
